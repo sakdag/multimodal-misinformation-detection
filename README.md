@@ -29,18 +29,18 @@ conda create -n misinfo-detect python=3.12
 conda activate misinfo-detect
 ```
 
-### 3. Install Dependencies
+## Install Dependencies
 Install the required dependencies using the following command:
 
 ```bash 
 pip install -r requirements.txt
 ```
 
-### 4. Downloading the Data
+## Downloading the Data
 To download the dataset, run the following command:
 
 ```bash
 python src/data_loader/download_data.py
 ```
 
-Then data will appear in the `data` directory.
+Then data will appear in the `data/raw` directory.
