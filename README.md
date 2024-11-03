@@ -10,10 +10,7 @@ This project is part of a PhD class in applied NLP, focusing on multimodal misin
 
 ## Project Overview
 
-This project aims to detect misinformation in multimodal data. The repository is organized to allow for data downloading, preprocessing, and experimentation with different classifiers. Key components include:
-- A data downloader script to fetch the required dataset.
-- A modular setup to add and train multiple classifiers.
-- Utility functions and preprocessing scripts to prepare data for training.
+This project aims to detect misinformation in multimodal data. 
 
 ## Environment Setup
 
@@ -21,12 +18,12 @@ This project aims to detect misinformation in multimodal data. The repository is
 Ensure [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) is installed on your system. Use the following command to create a Conda environment with Python 3.12:
 
 ```bash
-conda create -n misinfo-detect python=3.12
+conda create -n <your_env_name> python=3.12
 ```
 
 ### 2. Activate the Environment
 ```bash
-conda activate misinfo-detect
+conda activate <your_env_name>
 ```
 
 ## Install Dependencies
