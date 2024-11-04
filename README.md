@@ -6,6 +6,7 @@ This project is part of a PhD class in applied NLP, focusing on multimodal misin
 - [Project Overview](#project-overview)
 - [Environment Setup](#environment-setup)
 - [Installing Dependencies](#installing-dependencies)
+- [Add Formatter](#add-formatter)
 - [Downloading the Data](#downloading-the-data)
 
 ## Project Overview
@@ -32,6 +33,11 @@ Install the required dependencies using the following command:
 ```bash 
 pip install -r requirements.txt
 ```
+
+## Add Formatter
+Add black formatter to the project by completing the 
+[editor integration using this guide](https://black.readthedocs.io/en/stable/integrations/editors.html). Note that 
+the formatter is already installed as part of Install Dependencies step.
 
 ## Downloading the Data
 To download the dataset, run the following command:
