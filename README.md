@@ -43,7 +43,7 @@ the formatter is already installed as part of Install Dependencies step.
 To download the dataset, run the following command:
 
 ```bash
-python src/data_loader/download_data.py
+python -m src.data_loader.download_data
 ```
 
-Then data will appear in the `data/raw` directory.
+Then data will appear in the `data/raw/factify` directory.
