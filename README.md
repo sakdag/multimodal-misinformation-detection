@@ -45,6 +45,7 @@ To download the dataset, run the following command:
 ```bash
 python -m src.data_loader.download_data
 python -m src.data_loader.download_images
+python -m src.preprocess.preprocess
 ```
 
 Then data will appear in the `data/raw/factify` directory.
