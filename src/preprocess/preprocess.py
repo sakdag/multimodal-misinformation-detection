@@ -1,6 +1,6 @@
-import os
 import pandas as pd
-from pathlib import Path
+
+from src.utils.data_utils import HEADERS
 from src.utils.path_utils import get_project_root
 
 # Constants
@@ -34,32 +34,17 @@ def preprocess_csv(dataset: str):
         return
 
     # Load the CSV
-    df = pd.read_csv(csv_path)
-
-    # Rename columns
-    df.rename(
-        columns={
-            "Id": "id",
-            "claim_image": "claim_image",
-            "claim": "claim",
-            "claim_ocr": "claim_ocr",
-            "document_image": "evidence_image",
-            "document": "evidence",
-            "document_ocr": "evidence_ocr",
-            "Category": "category",
-        },
-        inplace=True,
-    )
+    df = pd.read_csv(csv_path, names=HEADERS, header=None, sep="\t", skiprows=1)
 
     # Update file paths for images
     def update_image_path(row, column_name):
         """Update the image path if it exists, else leave as None."""
         image_file = row[column_name]
         file_id = row["id"]
-        if column_name == "claim_image":
+        if column_name == "claim_image_original":
             file_path = images_folder / f"{file_id}_claim.jpg"
-        elif column_name == "evidence_image":
-            file_path = images_folder / f"{file_id}_document.jpg"
+        elif column_name == "evidence_image_original":
+            file_path = images_folder / f"{file_id}_evidence.jpg"
         else:
             return None
 
@@ -69,11 +54,18 @@ def preprocess_csv(dataset: str):
             return str(file_path.relative_to(PROJECT_ROOT))
         return None
 
+    df.rename(
+        columns={
+            "claim_image": "claim_image_original",
+            "evidence_image": "evidence_image_original",
+        },
+        inplace=True,
+    )
     df["claim_image"] = df.apply(
-        lambda row: update_image_path(row, "claim_image"), axis=1
+        lambda row: update_image_path(row, "claim_image_original"), axis=1
     )
     df["evidence_image"] = df.apply(
-        lambda row: update_image_path(row, "evidence_image"), axis=1
+        lambda row: update_image_path(row, "evidence_image_original"), axis=1
     )
 
     # Save the processed CSV

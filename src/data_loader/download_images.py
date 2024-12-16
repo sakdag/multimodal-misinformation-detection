@@ -4,11 +4,12 @@ import pandas as pd
 import requests
 import json
 import io
-from pathlib import Path
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from PIL import Image
+
+from src.utils.data_utils import HEADERS
 from src.utils.path_utils import get_project_root
 
 # Constants
@@ -23,7 +24,12 @@ def ensure_directories(images_folder):
 
 
 def download_image(url, save_path):
-    """Download a single image."""
+    """Download a single image if not already downloaded."""
+    # Check if the image already exists
+    if os.path.exists(save_path):
+        print(f"Image already exists: {save_path}")
+        return True
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) "
@@ -31,11 +37,12 @@ def download_image(url, save_path):
         )
     }
     try:
-        response = requests.get(url, headers=headers, stream=True)
+        response = requests.get(url, headers=headers, stream=True, timeout=30)
         response.raise_for_status()  # Raise an error for HTTP issues
         img = Image.open(io.BytesIO(response.content))
         img = img.convert("RGB")  # Ensure the image is in RGB format
         img.save(save_path)
+        print(f"Downloaded and saved image: {save_path}")
         return True
     except Exception as e:
         print(f"Failed to download image from {url}: {e}")
@@ -43,15 +50,24 @@ def download_image(url, save_path):
 
 
 def process_image(row, images_folder, stats, dataset_name):
-    """Process claim and document image downloads."""
-    file_id = str(row["Id"])
-    category = row.get("Category", "Unknown")
+    """Process claim and evidence image downloads."""
+    file_id = str(row["id"])
+    category = row.get("category", "Unknown")
     claim_image_url = row.get("claim_image", "")
-    document_image_url = row.get("document_image", "")
+    evidence_image_url = row.get("evidence_image", "")
 
     # Ensure category stats exist
+    stats["categories"].setdefault(
+        category,
+        {
+            "total_claim": 0,
+            "successful_claim": 0,
+            "total_evidence": 0,
+            "successful_evidence": 0,
+        },
+    )
     stats["categories"][category]["total_claim"] += 1
-    stats["categories"][category]["total_document"] += 1
+    stats["categories"][category]["total_evidence"] += 1
 
     # Download claim image
     if claim_image_url:
@@ -62,14 +78,14 @@ def process_image(row, images_folder, stats, dataset_name):
             stats["successful_claim"] += 1
             stats["categories"][category]["successful_claim"] += 1
 
-    # Download document image
-    if document_image_url:
+    # Download evidence image
+    if evidence_image_url:
         success = download_image(
-            document_image_url, os.path.join(images_folder, f"{file_id}_document.jpg")
+            evidence_image_url, os.path.join(images_folder, f"{file_id}_evidence.jpg")
         )
         if success:
-            stats["successful_document"] += 1
-            stats["categories"][category]["successful_document"] += 1
+            stats["successful_evidence"] += 1
+            stats["categories"][category]["successful_evidence"] += 1
 
 
 def download_images(dataset, use_threading):
@@ -87,18 +103,18 @@ def download_images(dataset, use_threading):
 
     stats = {
         "successful_claim": 0,
-        "successful_document": 0,
+        "successful_evidence": 0,
         "categories": defaultdict(
             lambda: {
                 "total_claim": 0,
                 "successful_claim": 0,
-                "total_document": 0,
-                "successful_document": 0,
+                "total_evidence": 0,
+                "successful_evidence": 0,
             }
         ),
     }
 
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path, names=HEADERS, header=None, sep="\t", skiprows=1)
 
     if use_threading:
         with ThreadPoolExecutor(max_workers=10) as executor:

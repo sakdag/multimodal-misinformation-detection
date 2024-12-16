@@ -2,12 +2,22 @@ import os
 import pandas as pd
 from PIL import Image
 from typing import Dict, Any
-from pathlib import Path
 from src.utils.path_utils import get_project_root
 
 # Constants
 PROJECT_ROOT = get_project_root()
 PREPROCESSED_DIR = PROJECT_ROOT / "data/preprocessed"
+
+HEADERS = [
+    "id",
+    "claim",
+    "claim_image",
+    "evidence",
+    "evidence_image",
+    "category",
+    "claim_ocr",
+    "evidence_ocr",
+]
 
 
 def get_preprocessed_data(dataset: str = "train") -> pd.DataFrame:
