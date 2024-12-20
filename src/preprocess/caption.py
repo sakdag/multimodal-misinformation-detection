@@ -118,11 +118,12 @@ def process_csv(input_csv: str, output_csv: str) -> None:
 
 
 if __name__ == "__main__":
-    input_csv = f"{PROCESSED_DIR}/train.csv"
-    output_csv = f"{PROCESSED_DIR}/train_enriched.csv"
+    for name in ["train", "test"]:
+        input_csv = f"{PROCESSED_DIR}/{name}.csv"
+        output_csv = f"{PROCESSED_DIR}/{name}_enriched.csv"
 
-    if not os.path.exists(input_csv):
-        raise FileNotFoundError(f"Input CSV file does not exist: {input_csv}")
+        if not os.path.exists(input_csv):
+            raise FileNotFoundError(f"Input CSV file does not exist: {input_csv}")
 
-    process_csv(input_csv, output_csv)
-    print(f"Processing complete. Output saved to {output_csv}")
+        process_csv(input_csv, output_csv)
+        print(f"Processing complete. Output saved to {output_csv}")
