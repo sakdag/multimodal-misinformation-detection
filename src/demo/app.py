@@ -1,12 +1,32 @@
 import streamlit as st
 from PIL import Image
 from transformers import BlipProcessor, BlipForConditionalGeneration
+import pandas as pd
+import os
+from src.utils.path_utils import get_project_root
+from src.utils.data_utils import PREPROCESSED_DIR
+from typing import List, Optional
+from dataclasses import dataclass
+import random
 
 # Initialize BLIP model and processor
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
 model = BlipForConditionalGeneration.from_pretrained(
     "Salesforce/blip-image-captioning-large"
 )
+
+PROJECT_ROOT = get_project_root()
+
+
+@dataclass
+class Evidence:
+    evidence: Optional[str]
+    evidence_image: Optional[Image.Image]
+    evidence_image_caption: Optional[str]
+    classification: Optional[str] = None
+
+
+CLASSIFICATION_CATEGORIES = ["support", "refute", "not_enough_information"]
 
 
 def generate_caption(image: Image.Image) -> str:
@@ -28,7 +48,90 @@ def enrich_text_with_caption(text: str, image_caption: str) -> str:
     return text
 
 
-# Streamlit app
+def retrieve_evidence(csv_path: str, num_rows: int = 3) -> List[Evidence]:
+    """Retrieves random evidence rows from a CSV file."""
+    evidences = []
+    try:
+        df = pd.read_csv(csv_path)
+        sampled_rows = df.sample(n=num_rows)
+        for _, row in sampled_rows.iterrows():
+            evidence_text = row.get("evidence")
+            evidence_image_caption = row.get("evidence_image_caption")
+
+            evidence_image_path = row.get("evidence_image")
+            evidence_image = None
+            if pd.notna(evidence_image_path):
+                full_image_path = os.path.join(PROJECT_ROOT, evidence_image_path)
+                try:
+                    evidence_image = Image.open(full_image_path).convert("RGB")
+                except Exception as e:
+                    st.error(f"Failed to load image {evidence_image_path}: {e}")
+
+            evidences.append(
+                Evidence(
+                    evidence=evidence_text,
+                    evidence_image=evidence_image,
+                    evidence_image_caption=evidence_image_caption,
+                )
+            )
+    except Exception as e:
+        st.error(f"Error loading CSV: {e}")
+
+    return evidences
+
+
+def classify_evidence(evidences: List[Evidence], claim: str) -> List[Evidence]:
+    """Assigns a random classification to each evidence."""
+    for evidence in evidences:
+        evidence.classification = random.choice(CLASSIFICATION_CATEGORIES)
+    return evidences
+
+
+def determine_final_classification(evidences: List[Evidence]) -> str:
+    """Determines the final classification based on evidence classifications."""
+    votes = {category: 0 for category in CLASSIFICATION_CATEGORIES}
+    for evidence in evidences:
+        if evidence.classification:
+            votes[evidence.classification] += 1
+
+    max_votes = max(votes.values())
+    top_categories = [k for k, v in votes.items() if v == max_votes]
+
+    if len(top_categories) > 1:
+        return "not_enough_information"
+    return top_categories[0]
+
+
+def display_evidence_tab(evidences: List[Evidence], tab_label: str):
+    """Displays evidence in a tabbed format."""
+    with st.container():
+        for index, evidence in enumerate(evidences):
+            with st.container():
+                st.subheader(f"Evidence {index + 1}")
+                if evidence.evidence_image:
+                    st.image(
+                        evidence.evidence_image,
+                        caption="Evidence Image",
+                        use_container_width=True,
+                    )
+                st.text_area(
+                    "Evidence Caption",
+                    value=evidence.evidence_image_caption or "No caption available.",
+                    height=100,
+                    key=f"caption_{tab_label}_{index}",
+                    disabled=True,
+                )
+                st.text_area(
+                    "Evidence Text",
+                    value=evidence.evidence or "No text available.",
+                    height=100,
+                    key=f"text_{tab_label}_{index}",
+                    disabled=True,
+                )
+                if evidence.classification:
+                    st.write(f"**Classification:** {evidence.classification}")
+
+
 def main():
     st.title("Text and Image Enrichment App")
 
@@ -82,6 +185,47 @@ def main():
         # Display the enriched text
         st.write("**Enriched Text:**")
         st.write(enriched_text)
+
+        # Load dataset and fetch evidence rows
+        dataset = "test_enriched"
+        csv_path = os.path.join(PREPROCESSED_DIR, f"{dataset}.csv")
+
+        # Evidence retrieved using text
+        text_evidences = retrieve_evidence(csv_path)
+        text_evidences = classify_evidence(text_evidences, enriched_text)
+
+        # Evidence retrieved using image
+        image_evidences = retrieve_evidence(csv_path)
+        image_evidences = classify_evidence(image_evidences, enriched_text)
+
+        # Interactive evidence display using tabs
+        if text_evidences or image_evidences:
+            st.write("## Retrieved Evidences")
+            tabs = st.tabs(["Text Evidences", "Image Evidences"])
+
+            # Display text evidences
+            with tabs[0]:
+                st.write("### Text Evidences")
+                display_evidence_tab(text_evidences, "text")
+
+            # Display image evidences
+            with tabs[1]:
+                st.write("### Image Evidences")
+                display_evidence_tab(image_evidences, "image")
+
+            # Final classification result
+            all_evidences = text_evidences + image_evidences
+            final_classification = determine_final_classification(all_evidences)
+            st.write("## Final Classification")
+            for idx, evidence in enumerate(text_evidences):
+                st.write(
+                    f"Text evidence {idx + 1} classification result: {evidence.classification}"
+                )
+            for idx, evidence in enumerate(image_evidences):
+                st.write(
+                    f"Image evidence {idx + 1} classification result: {evidence.classification}"
+                )
+            st.write(f"**Result:** {final_classification}")
 
 
 if __name__ == "__main__":
