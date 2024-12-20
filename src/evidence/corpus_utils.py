@@ -28,7 +28,48 @@ def separate_evidence_images(base_dir):
 
     print("All evidence images in the train set have been copied.")
 
+
+import os
+import pickle
+
+# File path for the evidence features pickle
+pickle_file_path = "evidence_features.pkl"
+
+
+# Function to update the keys in the pickle
+def update_pickle_keys(pickle_file_path, output_pickle_path=None):
+    # Open and load the existing pickle
+    with open(pickle_file_path, 'rb') as f:
+        feature_dict = pickle.load(f)
+
+    updated_dict = {}
+
+    # Update each key
+    for old_path, features in feature_dict.items():
+        # Extract the filename (e.g., test_0_evidence.jpg)
+        filename = os.path.basename(old_path)
+
+        # Determine if it's a test or train image based on the filename
+        if filename.startswith("test"):
+            new_relative_path = os.path.join("data", "raw", "factify", "extracted", "images", "test", filename.split("_", 1)[1])
+        elif filename.startswith("train"):
+            new_relative_path = os.path.join("data", "raw", "factify", "extracted", "images", "train", filename.split("_", 1)[1])
+        else:
+            raise ValueError(f"Unexpected filename format: {filename}")
+
+        # Add the updated key and its value to the new dictionary
+        updated_dict[new_relative_path] = features
+
+    # Save the updated dictionary back to a pickle file
+    output_path = output_pickle_path if output_pickle_path else pickle_file_path
+    with open(output_path, 'wb') as f:
+        pickle.dump(updated_dict, f)
+
+    print(f"Updated pickle saved at: {output_path}")
+
 # Example usage
 if __name__ == "__main__":
-    base_dir = "C:\\Users\\defne\\Desktop\\2024-2025FallSemester\\Applied NLP\\multimodal-misinformation-detection\\data\\raw\\factify\\extracted\\images"  # Replace with your base directory path
-    separate_evidence_images(base_dir)
+    pickle_file_path = "/evidence_features.pkl"
+    # Run the function
+    out_pkl_path = "C:\\Users\\defne\\Desktop\\2024-2025FallSemester\\Applied NLP\\multimodal-misinformation-detection\\data\\raw\\factify\\extracted\\images"
+    update_pickle_keys(pickle_file_path, output_pickle_path=out_pkl_path)
