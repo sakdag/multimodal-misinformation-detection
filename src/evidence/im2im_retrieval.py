@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch
 import pickle
 import matplotlib.pyplot as plt
+from src.utils.path_utils import get_project_root
 
 class ImageSimilarity:
 
@@ -93,10 +94,11 @@ class ImageCorpus:
 
 def visualize_retrieved_images(query_image_path, top_retrievals):
     # Load query image
-    query_image = Image.open(query_image_path).convert("RGB")
 
+    query_image = Image.open(query_image_path).convert("RGB")
+    project_base = get_project_root()
     # Load retrieved images and their scores
-    retrieved_images = [(Image.open(img_path).convert("RGB"), score) for img_path, score in top_retrievals]
+    retrieved_images = [(Image.open(os.path.join(project_base, img_path)).convert("RGB"), score) for img_path, score in top_retrievals]
 
     # Set up the grid for visualization
     total_retrieved = len(retrieved_images)
@@ -124,10 +126,14 @@ def visualize_retrieved_images(query_image_path, top_retrievals):
 
 if __name__ == '__main__':
 
-    image_feature = "C:\\Users\\defne\\Desktop\\2024-2025FallSemester\\Applied NLP\\multimodal-misinformation-detection\\data\\raw\\factify\\extracted\\images\\evidence_features.pkl"
-    image_dir = "C:\\Users\\defne\\Desktop\\2024-2025FallSemester\\Applied NLP\\multimodal-misinformation-detection\\data\\raw\\factify\\extracted\\images\\evidence_corpus"  # Replace with your base directory path
-    query_image_path = "C:\\Users\\defne\\Desktop\\2024-2025FallSemester\\Applied NLP\\multimodal-misinformation-detection\\data\\raw\\factify\\extracted\\images\\test\\1_claim.jpg"
+    project_root = get_project_root()
+    image_feature = os.path.join(project_root, "evidence_features.pkl")
+    image_dir = os.path.join(project_root, "data\\raw\\factify\\extracted\\images\\evidence_corpus")  # Replace with your base directory path
+    query_image_path = os.path.join(project_root, "data\\raw\\factify\\extracted\\images\\train\\1_claim.jpg")
 
     image_corpus = ImageCorpus(image_feature)
+    # corpus = image_corpus.create_feature_corpus(image_dir)
+
     top_retrievals = image_corpus.retrieve_similar_images(query_image_path, top_k=5)
+    print(top_retrievals)
     visualize_retrieved_images(query_image_path, top_retrievals)
