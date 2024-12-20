@@ -47,66 +47,74 @@ def process_image_row(row: pd.Series) -> Tuple[str, str, str, str]:
     )
 
 
-def initialize_csv(input_csv: str, output_csv: str) -> None:
-    """Initializes the output CSV with additional columns if not already created."""
-    if not os.path.exists(output_csv):
-        df = pd.read_csv(input_csv)
-
-        # Add new columns
-        df["claim_image_caption"] = ""
-        df["evidence_image_caption"] = ""
-        df["claim_enriched"] = ""
-        df["evidence_enriched"] = ""
-
-        # Save the initialized CSV
-        df.to_csv(output_csv, index=False)
+def get_last_processed_index(df: pd.DataFrame) -> int:
+    """
+    Find the last processed row index by searching backwards from the end
+    until finding a row where evidence_image_caption is not NA.
+    Returns -1 if no processed rows are found.
+    """
+    for idx in range(len(df) - 1, -1, -1):
+        if pd.notna(df.loc[idx, "evidence_image_caption"]):
+            return idx
+    return -1
 
 
 def process_csv(input_csv: str, output_csv: str) -> None:
-    """Processes the CSV in chunks and writes results incrementally."""
-    # Initialize the output CSV if not already created
-    initialize_csv(input_csv, output_csv)
-
-    # Load the output CSV to check progress
-    output_df = pd.read_csv(output_csv)
+    """Processes the CSV in chunks and writes results incrementally with efficient checkpointing."""
+    # Load input DataFrame
     input_df = pd.read_csv(input_csv)
 
-    # Ensure alignment between input and output CSVs
-    if len(output_df) != len(input_df):
-        raise ValueError("Mismatch between input and output CSV row counts.")
+    # Initialize or load output DataFrame
+    if os.path.exists(output_csv):
+        output_df = pd.read_csv(output_csv)
+        if len(output_df) != len(input_df):
+            print(
+                "Mismatch in input and output CSV lengths. Reinitializing output CSV..."
+            )
+    else:
+        output_df = input_df.copy()
+        for col in [
+            "claim_image_caption",
+            "evidence_image_caption",
+            "claim_enriched",
+            "evidence_enriched",
+        ]:
+            output_df[col] = pd.NA
 
-    for batch_start in tqdm(
-        range(0, len(input_df), BATCH_SIZE), desc="Processing rows"
-    ):
-        batch_end = min(batch_start + BATCH_SIZE, len(input_df))
-        batch = input_df.iloc[batch_start:batch_end]
+    # Find the last processed index
+    last_processed_idx = get_last_processed_index(output_df)
+    print(f"Resuming from index {last_processed_idx + 1}")
 
-        results = []
-        for _, row in batch.iterrows():
-            if pd.isna(output_df.at[batch_start + _, "claim_image_caption"]):
-                results.append(process_image_row(row))
-            else:
-                results.append(
-                    (
-                        output_df.at[batch_start + _, "claim_image_caption"],
-                        output_df.at[batch_start + _, "evidence_image_caption"],
-                        output_df.at[batch_start + _, "claim_enriched"],
-                        output_df.at[batch_start + _, "evidence_enriched"],
-                    )
+    # Process remaining rows in batches
+    total_rows = len(input_df)
+    with tqdm(total=total_rows, initial=last_processed_idx + 1) as pbar:
+        for idx in range(last_processed_idx + 1, total_rows, BATCH_SIZE):
+            batch_end = min(idx + BATCH_SIZE, total_rows)
+
+            # Process each row in the batch
+            for row_idx in range(idx, batch_end):
+                row = input_df.iloc[row_idx]
+
+                # Skip if already processed
+                if pd.notna(output_df.at[row_idx, "evidence_image_caption"]):
+                    continue
+
+                # Process the row
+                claim_cap, evidence_cap, claim_enr, evidence_enr = process_image_row(
+                    row
                 )
 
-        # Update the output dataframe with results
-        for idx, (claim_cap, evidence_cap, claim_enr, evidence_enr) in enumerate(
-            results
-        ):
-            output_idx = batch_start + idx
-            output_df.at[output_idx, "claim_image_caption"] = claim_cap
-            output_df.at[output_idx, "evidence_image_caption"] = evidence_cap
-            output_df.at[output_idx, "claim_enriched"] = claim_enr
-            output_df.at[output_idx, "evidence_enriched"] = evidence_enr
+                # Update the output DataFrame
+                output_df.loc[row_idx, "claim_image_caption"] = claim_cap
+                output_df.loc[row_idx, "evidence_image_caption"] = evidence_cap
+                output_df.loc[row_idx, "claim_enriched"] = claim_enr
+                output_df.loc[row_idx, "evidence_enriched"] = evidence_enr
 
-        # Save progress to CSV after processing each batch
-        output_df.to_csv(output_csv, index=False)
+                pbar.update(1)
+
+            # Save after each batch
+            output_df.to_csv(output_csv, index=False)
+            print(f"Saved progress at index {batch_end}")
 
 
 if __name__ == "__main__":
