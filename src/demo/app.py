@@ -20,6 +20,7 @@ PROJECT_ROOT = get_project_root()
 
 @dataclass
 class Evidence:
+    evidence_id: str
     evidence: Optional[str]
     evidence_image: Optional[Image.Image]
     evidence_image_caption: Optional[str]
@@ -48,7 +49,7 @@ def enrich_text_with_caption(text: str, image_caption: str) -> str:
     return text
 
 
-def retrieve_evidence(csv_path: str, num_rows: int = 3) -> List[Evidence]:
+def retrieve_evidence_by_text(csv_path: str, num_rows: int = 3) -> List[Evidence]:
     """Retrieves random evidence rows from a CSV file."""
     evidences = []
     try:
@@ -57,6 +58,7 @@ def retrieve_evidence(csv_path: str, num_rows: int = 3) -> List[Evidence]:
         for _, row in sampled_rows.iterrows():
             evidence_text = row.get("evidence")
             evidence_image_caption = row.get("evidence_image_caption")
+            evidence_id = row.get("id")
 
             evidence_image_path = row.get("evidence_image")
             evidence_image = None
@@ -72,6 +74,41 @@ def retrieve_evidence(csv_path: str, num_rows: int = 3) -> List[Evidence]:
                     evidence=evidence_text,
                     evidence_image=evidence_image,
                     evidence_image_caption=evidence_image_caption,
+                    evidence_id=evidence_id,
+                )
+            )
+    except Exception as e:
+        st.error(f"Error loading CSV: {e}")
+
+    return evidences
+
+
+def retrieve_evidence_by_image(csv_path: str, num_rows: int = 3) -> List[Evidence]:
+    """Retrieves random evidence rows from a CSV file."""
+    evidences = []
+    try:
+        df = pd.read_csv(csv_path)
+        sampled_rows = df.sample(n=num_rows)
+        for _, row in sampled_rows.iterrows():
+            evidence_text = row.get("evidence")
+            evidence_image_caption = row.get("evidence_image_caption")
+            evidence_id = row.get("id")
+
+            evidence_image_path = row.get("evidence_image")
+            evidence_image = None
+            if pd.notna(evidence_image_path):
+                full_image_path = os.path.join(PROJECT_ROOT, evidence_image_path)
+                try:
+                    evidence_image = Image.open(full_image_path).convert("RGB")
+                except Exception as e:
+                    st.error(f"Failed to load image {evidence_image_path}: {e}")
+
+            evidences.append(
+                Evidence(
+                    evidence=evidence_text,
+                    evidence_image=evidence_image,
+                    evidence_image_caption=evidence_image_caption,
+                    evidence_id=evidence_id,
                 )
             )
     except Exception as e:
@@ -191,11 +228,11 @@ def main():
         csv_path = os.path.join(PREPROCESSED_DIR, f"{dataset}.csv")
 
         # Evidence retrieved using text
-        text_evidences = retrieve_evidence(csv_path)
+        text_evidences = retrieve_evidence_by_text(csv_path)
         text_evidences = classify_evidence(text_evidences, enriched_text)
 
         # Evidence retrieved using image
-        image_evidences = retrieve_evidence(csv_path)
+        image_evidences = retrieve_evidence_by_image(csv_path)
         image_evidences = classify_evidence(image_evidences, enriched_text)
 
         # Interactive evidence display using tabs
