@@ -8,19 +8,26 @@ import pickle
 import matplotlib.pyplot as plt
 from src.utils.path_utils import get_project_root
 
-class ImageSimilarity:
 
+class ImageSimilarity:
     def __init__(self):
-        self.model = resnet50(weights='DEFAULT')
-        self.model = nn.Sequential(*list(self.model.children())[:-1])  #Ignoring the last classification layer
+        self.model = resnet50(weights="DEFAULT")
+        self.model = nn.Sequential(
+            *list(self.model.children())[:-1]
+        )  # Ignoring the last classification layer
         self.model.eval()
-        self.transform = transforms.Compose([transforms.Resize((224, 224)),
-                                             transforms.ToTensor(),
-                                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                                  std=[0.229, 0.224, 0.225])])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
 
     def extract_features(self, image_stream):
-        image = Image.open(image_stream).convert('RGB')
+        image = Image.open(image_stream).convert("RGB")
         image = self.transform(image).unsqueeze(0)
 
         with torch.no_grad():
@@ -34,6 +41,7 @@ class ImageSimilarity:
         similarity = cos(features1.unsqueeze(0), features2.unsqueeze(0))
         return similarity.item()
 
+
 class ImageCorpus:
     def __init__(self, feature_corpus_path):
         self.feature_corpus_path = feature_corpus_path
@@ -41,16 +49,16 @@ class ImageCorpus:
         self.feature_extractor = ImageSimilarity()
 
     def load_features(self):
-        if os.path.exists(self.feature_corpus_path):
-            try:
-                with open(self.feature_corpus_path, 'rb') as f:
-                    return pickle.load(f)
-            except (EOFError, pickle.UnpicklingError):
-                print("Warning: Pickle file is empty or corrupted. Initializing empty feature dict.")
-        return {}
+        try:
+            with open(self.feature_corpus_path, "rb") as f:
+                return pickle.load(f)
+        except (EOFError, pickle.UnpicklingError):
+            print(
+                "Warning: Pickle file is empty or corrupted. Initializing empty feature dict."
+            )
 
     def save_features(self):
-        with open(self.feature_corpus_path, 'wb') as f:
+        with open(self.feature_corpus_path, "wb") as f:
             pickle.dump(self.feature_dict, f)
 
     def add_image(self, image_path):
@@ -59,10 +67,11 @@ class ImageCorpus:
         self.save_features()
 
     def create_feature_corpus(self, image_dir):
-
         for image_name in os.listdir(image_dir):
             image_path = os.path.join(image_dir, image_name)
-            if os.path.isfile(image_path) and image_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+            if os.path.isfile(image_path) and image_path.lower().endswith(
+                (".png", ".jpg", ".jpeg")
+            ):
                 features = self.feature_extractor.extract_features(image_path)
                 self.feature_dict[image_path] = features
 
@@ -73,10 +82,14 @@ class ImageCorpus:
         similarity_scores = {}
 
         for image_name, corpus_feature in self.feature_dict.items():
-            similarity = self.feature_extractor.similarity(query_features, corpus_feature)
+            similarity = self.feature_extractor.similarity(
+                query_features, corpus_feature
+            )
             similarity_scores[image_name] = similarity
 
-        retrieved_images = sorted(similarity_scores.items(), key=lambda x: x[1], reverse=True)
+        retrieved_images = sorted(
+            similarity_scores.items(), key=lambda x: x[1], reverse=True
+        )
 
         # Filter out identical images (based on scores)
         unique_scores = set()
@@ -92,13 +105,17 @@ class ImageCorpus:
 
         return filtered_images
 
+
 def visualize_retrieved_images(query_image_path, top_retrievals):
     # Load query image
 
     query_image = Image.open(query_image_path).convert("RGB")
     project_base = get_project_root()
     # Load retrieved images and their scores
-    retrieved_images = [(Image.open(os.path.join(project_base, img_path)).convert("RGB"), score) for img_path, score in top_retrievals]
+    retrieved_images = [
+        (Image.open(os.path.join(project_base, img_path)).convert("RGB"), score)
+        for img_path, score in top_retrievals
+    ]
 
     # Set up the grid for visualization
     total_retrieved = len(retrieved_images)
@@ -112,27 +129,40 @@ def visualize_retrieved_images(query_image_path, top_retrievals):
     plt.subplot(rows, cols, (cols // 2) + 1)  # Center in the first row
     plt.imshow(query_image)
     plt.title("Query Image", fontsize=12)
-    plt.axis('off')
+    plt.axis("off")
 
     # Plot retrieved images
     for idx, (img, score) in enumerate(retrieved_images):
         plt.subplot(rows, cols, cols + idx + 1)  # Start plotting after the query image
         plt.imshow(img)
         plt.title(f"Rank: {idx+1}\nScore: {score:.4f}", fontsize=10)
-        plt.axis('off')
+        plt.axis("off")
 
     plt.tight_layout()
     plt.show()
 
-if __name__ == '__main__':
 
+if __name__ == "__main__":
     project_root = get_project_root()
-    image_feature = os.path.join(project_root, "evidence_features.pkl")
-    image_dir = os.path.join(project_root, "data\\raw\\factify\\extracted\\images\\evidence_corpus")  # Replace with your base directory path
-    query_image_path = os.path.join(project_root, "data\\raw\\factify\\extracted\\images\\train\\1_claim.jpg")
+    image_feature = os.path.join(project_root, "evidence_feature.pkl")
+    image_dir = os.path.join(
+        project_root, "data", "raw", "factify", "extracted", "images", "evidence_corpus"
+    )  # Replace with your base directory path
+
+    query_image_path = os.path.join(
+        project_root,
+        "data",
+        "raw",
+        "factify",
+        "extracted",
+        "images",
+        "train",
+        "1_claim.jpg",
+    )
 
     image_corpus = ImageCorpus(image_feature)
     # corpus = image_corpus.create_feature_corpus(image_dir)
+    print(list(image_corpus.feature_dict.keys())[0])
 
     top_retrievals = image_corpus.retrieve_similar_images(query_image_path, top_k=5)
     print(top_retrievals)
