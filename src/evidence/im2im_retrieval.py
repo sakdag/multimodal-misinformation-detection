@@ -144,7 +144,7 @@ def visualize_retrieved_images(query_image_path, top_retrievals):
 
 if __name__ == "__main__":
     project_root = get_project_root()
-    image_feature = os.path.join(project_root, "evidence_feature.pkl")
+    image_feature = os.path.join(project_root, "evidence_featuresF.pkl")
     image_dir = os.path.join(
         project_root, "data", "raw", "factify", "extracted", "images", "evidence_corpus"
     )  # Replace with your base directory path
