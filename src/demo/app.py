@@ -28,7 +28,8 @@ class Evidence:
     image: Optional[Image.Image]
     caption: Optional[str]
     image_path: Optional[str]
-    classification_result: Optional[Tuple[str, str, str, str]] = None
+    classification_result_all: Optional[Tuple[str, str, str, str]] = None
+    classification_result_final: Optional[str] = None
 
 
 CLASSIFICATION_CATEGORIES = ["support", "refute", "not_enough_information"]
@@ -283,12 +284,47 @@ def display_evidence_tab(evidences: List[Evidence], tab_label: str):
                     key=f"text_{tab_label}_{index}",
                     disabled=True,
                 )
-                if evidence.classification_result:
+                if evidence.classification_result_all:
                     st.write("**Classification:**")
-                    st.write(f"**text|text:** {evidence.classification_result[0]}")
-                    st.write(f"**text|image:** {evidence.classification_result[1]}")
-                    st.write(f"**image|text:** {evidence.classification_result[2]}")
-                    st.write(f"**image|image:** {evidence.classification_result[3]}")
+                    st.write(f"**text|text:** {evidence.classification_result_all[0]}")
+                    st.write(f"**text|image:** {evidence.classification_result_all[1]}")
+                    st.write(f"**image|text:** {evidence.classification_result_all[2]}")
+                    st.write(
+                        f"**image|image:** {evidence.classification_result_all[3]}"
+                    )
+                    st.write(
+                        f"**Final classification result:** {evidence.classification_result_final}"
+                    )
+
+
+def get_final_classification(results: Tuple[str, str, str, str]) -> str:
+    text_text = results[0]
+    text_image = results[1]
+    image_text = results[2]
+    image_image = results[3]
+
+    # Helper function to determine the final classification based on two inputs
+    def resolve_classification(val1: str, val2: str) -> str:
+        if val1 == val2 and val1 in {"support", "refute"}:
+            return val1
+        if (val1 in {"support", "refute"} and val2 == "not_enough_information") or (
+            val2 in {"support", "refute"} and val1 == "not_enough_information"
+        ):
+            return val1 if val1 != "not_enough_information" else val2
+        return "not_enough_information"
+
+    # Step 1: Check text_text and image_image
+    final_result = resolve_classification(text_text, image_image)
+    if final_result != "not_enough_information":
+        return final_result
+
+    # Step 2: Check text_image and image_text
+    final_result = resolve_classification(text_image, image_text)
+    if final_result != "not_enough_information":
+        return final_result
+
+    # Step 3: If still undetermined, return "not_enough_information"
+    return "not_enough_information"
 
 
 def main():
@@ -380,7 +416,10 @@ def main():
                 evidence_text=evidence.text,
                 evidence_image_path=evidence.image_path,
             )
-            evidence.classification_result = a, b, c, d
+            evidence.classification_result_all = a, b, c, d
+            evidence.classification_result_final = get_final_classification(
+                evidence.classification_result_all
+            )
 
         # Step 6: Display evidences
         progress.progress(100)
