@@ -1,3 +1,5 @@
+from collections import Counter
+
 import streamlit as st
 from PIL import Image
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -33,6 +35,11 @@ class Evidence:
 
 
 CLASSIFICATION_CATEGORIES = ["support", "refute", "not_enough_information"]
+CATEGORY_MAPPING = {
+    "support": "Support",
+    "refute": "Refute",
+    "not_enough_information": "Not Enough Information",
+}
 
 
 def generate_caption(image: Image.Image) -> str:
@@ -286,14 +293,20 @@ def display_evidence_tab(evidences: List[Evidence], tab_label: str):
                 )
                 if evidence.classification_result_all:
                     st.write("**Classification:**")
-                    st.write(f"**text|text:** {evidence.classification_result_all[0]}")
-                    st.write(f"**text|image:** {evidence.classification_result_all[1]}")
-                    st.write(f"**image|text:** {evidence.classification_result_all[2]}")
                     st.write(
-                        f"**image|image:** {evidence.classification_result_all[3]}"
+                        f"**text|text:** {CATEGORY_MAPPING[evidence.classification_result_all[0]]}"
                     )
                     st.write(
-                        f"**Final classification result:** {evidence.classification_result_final}"
+                        f"**text|image:** {CATEGORY_MAPPING[evidence.classification_result_all[1]]}"
+                    )
+                    st.write(
+                        f"**image|text:** {CATEGORY_MAPPING[evidence.classification_result_all[2]]}"
+                    )
+                    st.write(
+                        f"**image|image:** {CATEGORY_MAPPING[evidence.classification_result_all[3]]}"
+                    )
+                    st.write(
+                        f"**Final classification result:** {CATEGORY_MAPPING[evidence.classification_result_final]}"
                     )
 
 
@@ -325,6 +338,37 @@ def get_final_classification(results: Tuple[str, str, str, str]) -> str:
 
     # Step 3: If still undetermined, return "not_enough_information"
     return "not_enough_information"
+
+
+def determine_final_classification(
+    text_evidences: List[Evidence], image_evidences: List[Evidence]
+) -> Tuple[str, List[int]]:
+    """Determine the final classification based on evidences."""
+    classification_counts = Counter()
+    index_mapping = {"support": [], "refute": [], "not_enough_information": []}
+
+    all_evidences = (text_evidences or []) + (image_evidences or [])
+
+    for idx, evidence in enumerate(all_evidences):
+        if evidence.classification_result_final:
+            classification = evidence.classification_result_final
+            classification_counts[classification] += 1
+            index_mapping[classification].append(idx + 1)  # 1-based index
+
+    support_count = classification_counts["support"]
+    refute_count = classification_counts["refute"]
+    ne_info_count = classification_counts["not_enough_information"]
+
+    if support_count == 0 and refute_count == 0:
+        final_classification = "not_enough_information"
+    elif support_count == refute_count:
+        final_classification = "not_enough_information"
+    else:
+        final_classification = "support" if support_count > refute_count else "refute"
+
+    contributing_indices = index_mapping[final_classification]
+
+    return final_classification, contributing_indices
 
 
 def main():
@@ -391,7 +435,7 @@ def main():
             text_evidences = retrieve_evidences_by_text(enriched_text, top_k=top_k_text)
             st.write(f"Retrieved {len(text_evidences)} text evidences.")
         else:
-            text_evidences = None
+            text_evidences = []
             st.write("Text modality is missing from the input claim!")
 
         # Step 4: Retrieve evidences by image
@@ -403,13 +447,13 @@ def main():
             )
             st.write(f"Retrieved {len(image_evidences)} image evidences.")
         else:
-            image_evidences = None
+            image_evidences = []
             st.write("Image modality is missing from the input claim!")
 
         # Step 5: Classify evidences
         progress.progress(90)
         st.write("### Step 5: Verifying claim with retrieved evidences...")
-        for evidence in (text_evidences or []) + (image_evidences or []):
+        for evidence in text_evidences + image_evidences:
             a, b, c, d = classify_evidence(
                 claim_text=enriched_text,
                 claim_image_path=uploaded_image,
@@ -440,6 +484,30 @@ def main():
                     display_evidence_tab(image_evidences, "image")
                 else:
                     st.write("Image modality is missing from the input claim!")
+
+            # Final Combined Classification
+            final_classification, contributing_indices = determine_final_classification(
+                text_evidences, image_evidences
+            )
+
+            st.write("### Final Combined Classification")
+            st.write(
+                f"**Classification Result:** {CATEGORY_MAPPING[final_classification]}"
+            )
+            if contributing_indices:
+                st.write("**Contributing Evidences:**")
+                for index in contributing_indices:
+                    all_evidences = text_evidences + image_evidences
+                    evidence = all_evidences[index - 1]  # Adjust index to be 0-based
+                    evidence_type = "Text" if evidence in text_evidences else "Image"
+                    if evidence_type == "Text":
+                        st.write(f"{evidence_type.capitalize()} Evidence {index}")
+                    else:
+                        st.write(
+                            f"{evidence_type.capitalize()} Evidence {index - len(image_evidences)}"
+                        )
+            else:
+                st.write("No evidences contributed to this classification.")
 
 
 if __name__ == "__main__":
