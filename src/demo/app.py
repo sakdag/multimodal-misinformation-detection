@@ -431,42 +431,50 @@ def main():
         # Step 3: Retrieve evidences by text
         progress.progress(50)
         st.write("### Step 3: Retrieving evidences by text...")
-        if input_text:
-            text_evidences = retrieve_evidences_by_text(enriched_text, top_k=top_k_text)
-            st.write(f"Retrieved {len(text_evidences)} text evidences.")
-        else:
-            text_evidences = []
-            st.write("Text modality is missing from the input claim!")
+        with st.spinner("Retrieving evidences by text..."):
+            if input_text:
+                text_evidences = retrieve_evidences_by_text(
+                    enriched_text, top_k=top_k_text
+                )
+                st.write(f"Retrieved {len(text_evidences)} text evidences.")
+            else:
+                text_evidences = []
+                st.write("Text modality is missing from the input claim!")
 
         # Step 4: Retrieve evidences by image
         progress.progress(70)
         st.write("### Step 4: Retrieving evidences by image...")
-        if uploaded_image:
-            image_evidences = retrieve_evidences_by_image(
-                uploaded_image, top_k=top_k_image
-            )
-            st.write(f"Retrieved {len(image_evidences)} image evidences.")
-        else:
-            image_evidences = []
-            st.write("Image modality is missing from the input claim!")
+        with st.spinner("Retrieving evidences by image..."):
+            if uploaded_image:
+                image_evidences = retrieve_evidences_by_image(
+                    uploaded_image, top_k=top_k_image
+                )
+                st.write(f"Retrieved {len(image_evidences)} image evidences.")
+            else:
+                image_evidences = []
+                st.write("Image modality is missing from the input claim!")
 
         # Step 5: Classify evidences
         progress.progress(90)
         st.write("### Step 5: Verifying claim with retrieved evidences...")
-        for evidence in text_evidences + image_evidences:
-            a, b, c, d = classify_evidence(
-                claim_text=enriched_text,
-                claim_image_path=uploaded_image,
-                evidence_text=evidence.text,
-                evidence_image_path=evidence.image_path,
-            )
-            evidence.classification_result_all = a, b, c, d
-            evidence.classification_result_final = get_final_classification(
-                evidence.classification_result_all
-            )
+        with st.spinner("Verifying claim with retrieved evidences..."):
+            for evidence in text_evidences + image_evidences:
+                a, b, c, d = classify_evidence(
+                    claim_text=enriched_text,
+                    claim_image_path=uploaded_image,
+                    evidence_text=evidence.text,
+                    evidence_image_path=evidence.image_path,
+                )
+                evidence.classification_result_all = a, b, c, d
+                evidence.classification_result_final = get_final_classification(
+                    evidence.classification_result_all
+                )
 
         # Step 6: Display evidences
         progress.progress(100)
+
+        st.divider()
+
         if text_evidences or image_evidences:
             st.write("## Results")
             tabs = st.tabs(["Text Evidences", "Image Evidences"])
@@ -489,6 +497,8 @@ def main():
             final_classification, contributing_indices = determine_final_classification(
                 text_evidences, image_evidences
             )
+
+            st.divider()
 
             st.write("### Final Combined Classification")
             st.write(
