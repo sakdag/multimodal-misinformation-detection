@@ -1,12 +1,10 @@
-import random
-import time
-
 import streamlit as st
 from PIL import Image
 from transformers import BlipProcessor, BlipForConditionalGeneration
 import pandas as pd
 import os
 
+from evaluate import MisinformationPredictor
 from src.evidence.im2im_retrieval import ImageCorpus
 from src.evidence.text2text_retrieval import SemanticSimilarity
 from src.utils.path_utils import get_project_root
@@ -211,15 +209,13 @@ def retrieve_evidences_by_image(
                 except Exception as e:
                     st.error(f"Failed to load image {evidence_image_path}: {e}")
 
-            evidence_dataset = evidence_id.split("_")[1].split(".")[0]
-
             # Create an Evidence object
             evidences.append(
                 Evidence(
                     text=evidence_text,
                     image=evidence_image,
                     caption=evidence_image_caption,
-                    dataset=evidence_dataset,
+                    dataset=evidence_path.split("/")[-2],
                     evidence_id=evidence_id_number,
                     image_path=full_image_path,
                 )
@@ -230,17 +226,33 @@ def retrieve_evidences_by_image(
     return evidences
 
 
+@st.cache_resource
+def get_predictor():
+    return MisinformationPredictor(model_path="ckpts/model.pt", device="cpu")
+
+
 def classify_evidence(
     claim_text: str, claim_image_path: str, evidence_text: str, evidence_image_path: str
 ) -> Tuple[str, str, str, str]:
     """Assigns a random classification to each evidence."""
-    time.sleep(1)
-    return (
-        random.choice(CLASSIFICATION_CATEGORIES),
-        random.choice(CLASSIFICATION_CATEGORIES),
-        random.choice(CLASSIFICATION_CATEGORIES),
-        random.choice(CLASSIFICATION_CATEGORIES),
+    predictor = get_predictor()
+    predictions = predictor.evaluate(
+        claim_text, claim_image_path, evidence_text, evidence_image_path
     )
+    if predictions:
+        return (
+            predictions.get("text_text", "not_enough_information"),
+            predictions.get("text_image", "not_enough_information"),
+            predictions.get("image_text", "not_enough_information"),
+            predictions.get("image_image", "not_enough_information"),
+        )
+    else:
+        return (
+            "not_enough_information",
+            "not_enough_information",
+            "not_enough_information",
+            "not_enough_information",
+        )
 
 
 def display_evidence_tab(evidences: List[Evidence], tab_label: str):
@@ -281,10 +293,7 @@ def display_evidence_tab(evidences: List[Evidence], tab_label: str):
 
 def main():
     st.title("Multimodal Evidence-Based Misinformation Classification")
-
-    st.write(
-        "Upload an image and/or enter text to enrich the text with an image caption."
-    )
+    st.write("Upload claims that have image and/or text content to verify.")
 
     # File uploader for images
     uploaded_image = st.file_uploader(
@@ -342,19 +351,29 @@ def main():
         # Step 3: Retrieve evidences by text
         progress.progress(50)
         st.write("### Step 3: Retrieving evidences by text...")
-        text_evidences = retrieve_evidences_by_text(enriched_text, top_k=top_k_text)
-        st.write(f"Retrieved {len(text_evidences)} text evidences.")
+        if input_text:
+            text_evidences = retrieve_evidences_by_text(enriched_text, top_k=top_k_text)
+            st.write(f"Retrieved {len(text_evidences)} text evidences.")
+        else:
+            text_evidences = None
+            st.write("Text modality is missing from the input claim!")
 
         # Step 4: Retrieve evidences by image
         progress.progress(70)
         st.write("### Step 4: Retrieving evidences by image...")
-        image_evidences = retrieve_evidences_by_image(uploaded_image, top_k=top_k_image)
-        st.write(f"Retrieved {len(image_evidences)} image evidences.")
+        if uploaded_image:
+            image_evidences = retrieve_evidences_by_image(
+                uploaded_image, top_k=top_k_image
+            )
+            st.write(f"Retrieved {len(image_evidences)} image evidences.")
+        else:
+            image_evidences = None
+            st.write("Image modality is missing from the input claim!")
 
         # Step 5: Classify evidences
         progress.progress(90)
         st.write("### Step 5: Verifying claim with retrieved evidences...")
-        for evidence in text_evidences + image_evidences:
+        for evidence in (text_evidences or []) + (image_evidences or []):
             a, b, c, d = classify_evidence(
                 claim_text=enriched_text,
                 claim_image_path=uploaded_image,
@@ -370,12 +389,18 @@ def main():
             tabs = st.tabs(["Text Evidences", "Image Evidences"])
 
             with tabs[0]:
-                st.write("### Text Evidences")
-                display_evidence_tab(text_evidences, "text")
+                if text_evidences:
+                    st.write("### Text Evidences")
+                    display_evidence_tab(text_evidences, "text")
+                else:
+                    st.write("Text modality is missing from the input claim!")
 
             with tabs[1]:
-                st.write("### Image Evidences")
-                display_evidence_tab(image_evidences, "image")
+                if image_evidences:
+                    st.write("### Image Evidences")
+                    display_evidence_tab(image_evidences, "image")
+                else:
+                    st.write("Image modality is missing from the input claim!")
 
 
 if __name__ == "__main__":
