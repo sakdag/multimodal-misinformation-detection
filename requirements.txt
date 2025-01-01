@@ -14,3 +14,5 @@ ruff-lsp==0.0.59
 streamlit==1.41.1
 sentence-transformers==3.3.1
 h5py==3.12.1
+tiktoken==0.8.0
+sentencepiece==0.2.0

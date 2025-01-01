@@ -286,81 +286,93 @@ def main():
         "Upload an image and/or enter text to enrich the text with an image caption."
     )
 
-    # File uploader for images (only one image allowed)
-    if "uploaded_image" not in st.session_state:
-        st.session_state.uploaded_image = None
-
+    # File uploader for images
     uploaded_image = st.file_uploader(
         "Upload an image (1 max)", type=["jpg", "jpeg", "png"], key="image_uploader"
     )
 
     if uploaded_image:
-        st.session_state.uploaded_image = uploaded_image
-
-    # Display the uploaded image immediately
-    if st.session_state.uploaded_image:
         try:
-            image = Image.open(st.session_state.uploaded_image).convert("RGB")
+            image = Image.open(uploaded_image).convert("RGB")
             st.image(image, caption="Uploaded Image", use_container_width=True)
         except Exception as e:
             st.error(f"Failed to display the image: {e}")
 
-    # Text input field (limit to 4096 characters)
+    # Text input field
     input_text = st.text_area("Enter text (max 4096 characters)", "", max_chars=4096)
+
+    # Sliders for top_k values
+    col1, col2 = st.columns(2)
+    with col1:
+        top_k_text = st.slider(
+            "Top-k Text Evidences", min_value=1, max_value=5, value=2, key="top_k_text"
+        )
+    with col2:
+        top_k_image = st.slider(
+            "Top-k Image Evidences",
+            min_value=1,
+            max_value=5,
+            value=2,
+            key="top_k_image",
+        )
 
     # Generate Enriched Text button
     if st.button("Verify Claim"):
-        if not st.session_state.uploaded_image and not input_text:
+        if not uploaded_image and not input_text:
             st.warning("Please upload an image or enter text.")
             return
 
-        # Generate caption if an image is uploaded
+        progress = st.progress(0)
+
+        # Step 1: Generate caption
+        progress.progress(10)
+        st.write("### Step 1: Generating caption...")
         image_caption = ""
-        if st.session_state.uploaded_image:
+        if uploaded_image:
             image_caption = generate_caption(image)
             st.write("**Generated Image Caption:**", image_caption)
 
-        # Enrich text with the generated caption
-        with st.spinner("Enriching text..."):
-            enriched_text = enrich_text_with_caption(input_text, image_caption)
-
-        # Display the enriched text
+        # Step 2: Enrich text
+        progress.progress(40)
+        st.write("### Step 2: Enriching text...")
+        enriched_text = enrich_text_with_caption(input_text, image_caption)
         st.write("**Enriched Text:**")
         st.write(enriched_text)
 
-        # Evidence retrieved using text
-        text_evidences = retrieve_evidences_by_text(enriched_text)
-        for text_evidence in text_evidences:
+        # Step 3: Retrieve evidences by text
+        progress.progress(50)
+        st.write("### Step 3: Retrieving evidences by text...")
+        text_evidences = retrieve_evidences_by_text(enriched_text, top_k=top_k_text)
+        st.write(f"Retrieved {len(text_evidences)} text evidences.")
+
+        # Step 4: Retrieve evidences by image
+        progress.progress(70)
+        st.write("### Step 4: Retrieving evidences by image...")
+        image_evidences = retrieve_evidences_by_image(uploaded_image, top_k=top_k_image)
+        st.write(f"Retrieved {len(image_evidences)} image evidences.")
+
+        # Step 5: Classify evidences
+        progress.progress(90)
+        st.write("### Step 5: Verifying claim with retrieved evidences...")
+        for evidence in text_evidences + image_evidences:
             a, b, c, d = classify_evidence(
                 claim_text=enriched_text,
-                claim_image_path=st.session_state.uploaded_image,
-                evidence_text=text_evidence.text,
-                evidence_image_path=text_evidence.image_path,
+                claim_image_path=uploaded_image,
+                evidence_text=evidence.text,
+                evidence_image_path=evidence.image_path,
             )
-            text_evidence.classification_result = a, b, c, d
+            evidence.classification_result = a, b, c, d
 
-        # Evidence retrieved using image
-        image_evidences = retrieve_evidences_by_image(st.session_state.uploaded_image)
-        for image_evidence in image_evidences:
-            a, b, c, d = classify_evidence(
-                claim_text=enriched_text,
-                claim_image_path=st.session_state.uploaded_image,
-                evidence_text=image_evidence.text,
-                evidence_image_path=image_evidence.image_path,
-            )
-            image_evidence.classification_result = a, b, c, d
-
-        # Interactive evidence display using tabs
+        # Step 6: Display evidences
+        progress.progress(100)
         if text_evidences or image_evidences:
-            st.write("## Retrieved Evidences")
+            st.write("## Results")
             tabs = st.tabs(["Text Evidences", "Image Evidences"])
 
-            # Display text evidences
             with tabs[0]:
                 st.write("### Text Evidences")
                 display_evidence_tab(text_evidences, "text")
 
-            # Display image evidences
             with tabs[1]:
                 st.write("### Image Evidences")
                 display_evidence_tab(image_evidences, "image")
