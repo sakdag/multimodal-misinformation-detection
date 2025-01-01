@@ -12,9 +12,10 @@ class SemanticSimilarity:
         self,
         train_embeddings_file,
         test_embeddings_file,
-        train_csv_path,
-        test_csv_path,
-        no_rerank=False,
+        train_csv_path=None,
+        test_csv_path=None,
+        train_df=None,
+        test_df=None,
     ):
         # We use the Bi-Encoder to encode all passages
         self.bi_encoder = SentenceTransformer("multi-qa-mpnet-base-dot-v1")
@@ -30,8 +31,10 @@ class SemanticSimilarity:
         )
 
         # Load corresponding CSV files for enriched evidence
-        self.train_csv = pd.read_csv(train_csv_path)
-        self.test_csv = pd.read_csv(test_csv_path)
+        self.train_csv = (
+            train_df if train_df is not None else pd.read_csv(train_csv_path)
+        )
+        self.test_csv = test_df if test_df is not None else pd.read_csv(test_csv_path)
 
     def _load_embeddings(self, h5_file_path):
         """
@@ -54,12 +57,12 @@ class SemanticSimilarity:
             question_embedding, self.train_embeddings, top_k=top_k * 5
         )
         hits_train = hits_train[0]  # Get the hits for the first query
-        print(f"len(hits_train) = {len(hits_train)}")
+        # print(f"len(hits_train) = {len(hits_train)}")
         hits_test = util.semantic_search(
             question_embedding, self.test_embeddings, top_k=top_k * 5
         )
         hits_test = hits_test[0]
-        print(f"len(hits_test): {len(hits_test)}")
+        # print(f"len(hits_test): {len(hits_test)}")
 
         ##### Re-Ranking #####
         # Now, score all retrieved passages with the cross_encoder
@@ -103,7 +106,7 @@ class SemanticSimilarity:
         unique_scores = set()
         filtered_results = []
 
-        print(results)
+        # print(results)
         for id_, score in sorted(results, key=lambda x: x[1], reverse=True):
             if score not in unique_scores:
                 unique_scores.add(score)
@@ -182,7 +185,6 @@ if __name__ == "__main__":
         test_embeddings_file=test_embeddings_file,
         train_csv_path=train_csv_path,
         test_csv_path=test_csv_path,
-        no_rerank=False,  # Set to True if reranking is not needed
     )
 
     # Load the first query from train_enriched.csv
