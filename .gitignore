@@ -167,4 +167,12 @@ evidence_features.pkl
 train_evidence_embeddings.pkl
 test_embeddings.h5
 train_embeddings.h5
+train_embeddings_notenriched.h5
+test_embeddings_notenriched.h5
+
 ckpts/model.pt
+
+image_retrieval_topk_accuracy_results.txt
+topk_accuracy_results.txt
+topk_accuracy_results_notenriched.txt
+
