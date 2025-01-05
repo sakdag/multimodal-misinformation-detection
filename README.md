@@ -1,17 +1,20 @@
 # Multimodal Misinformation Detection
 
-This project is part of a PhD class in applied NLP, focusing on multimodal misinformation detection. The repository includes scripts for data downloading, preprocessing, and building classifiers to detect misinformation using multimodal data.
+This repository contains source codes for class project we delivered as part of a graduate class in applied NLP, at Middle East Technical University Computer Engineering department. Project is focusing on multimodal misinformation detection.
 
 ## Table of Contents
 - [Project Overview](#project-overview)
 - [Environment Setup](#environment-setup)
 - [Installing Dependencies](#installing-dependencies)
-- [Add Formatter](#add-formatter)
 - [Downloading the Data](#downloading-the-data)
+- [Downloading the Images](#downloading-the-images)
+- [Preprocessing the Data](#preprocessing-the-data)
+- [Enriching Claim and Evidence Text Using Image Captioning](#enriching-claim-and-evidence-text-using-image-captioning)
+- [Running the Streamlit Demo App](#running-the-streamlit-demo-app)
 
 ## Project Overview
 
-This project aims to detect misinformation in multimodal data. 
+This project aims to detect misinformation in multimodal data through evidence-backed approach.
 
 ## Environment Setup
 
@@ -34,18 +37,53 @@ Install the required dependencies using the following command:
 pip install -r requirements.txt
 ```
 
-## Add Formatter
-Add black formatter to the project by completing the 
-[editor integration using this guide](https://black.readthedocs.io/en/stable/integrations/editors.html). Note that 
-the formatter is already installed as part of Install Dependencies step.
-
 ## Downloading the Data
 To download the dataset, run the following command:
 
 ```bash
 python -m src.data_loader.download_data
+```
+
+Then data will appear in the `data/raw/factify` directory. 
+The zip file will be downloaded to `data/raw/factify/factify_data.zip` and 
+extracted to `data/raw/factify/extracted`. You should see `train.csv` and `test.csv` separately.
+
+## Downloading the images
+Using the image links in the CSVs, to download all images, run below.
+
+```bash
 python -m src.data_loader.download_images
+```
+
+Then images will appear in the `data/raw/factify/extracted/images` directory.
+
+## Preprocessing the data
+To apply the preprocessing scripts, run the following commands:
+
+```bash
 python -m src.preprocess.preprocess
 ```
 
-Then data will appear in the `data/raw/factify` directory.
+Then preprocessed data will appear in the `data/processed/` directory. 
+You should see `train.csv` and `test.csv` separately.
+
+## Enriching claim and evidence text using image captioning
+To run image captioning, run the following commands:
+
+```bash
+python -m src.preprocess.caption
+```
+
+This will go over the preprocessed data and enrich the claim and evidence text with image captions. 
+The new columns will appear in the `data/processed/` directory. 
+You should see `train_enriched.csv` and `test_enriched.csv` separately.
+
+## Running the streamlit demo app
+To run the streamlit demo app, run the following command:
+
+```bash
+python -m streamlit run src/demo/app.py
+```
+
+This will open a new tab in your browser with the demo app. 
+You should be able to enter multimodal claims and play around with the trained model and the pipeline.

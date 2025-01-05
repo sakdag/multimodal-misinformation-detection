@@ -465,7 +465,12 @@ def main():
                     evidence_text=evidence.text,
                     evidence_image_path=evidence.image_path,
                 )
-                evidence.classification_result_all = a, b, c, d
+                evidence.classification_result_all = (
+                    a or "not_enough_information",
+                    b or "not_enough_information",
+                    c or "not_enough_information",
+                    d or "not_enough_information",
+                )
                 evidence.classification_result_final = get_final_classification(
                     evidence.classification_result_all
                 )
@@ -514,7 +519,7 @@ def main():
                         st.write(f"{evidence_type.capitalize()} Evidence {index}")
                     else:
                         st.write(
-                            f"{evidence_type.capitalize()} Evidence {index - len(image_evidences)}"
+                            f"{evidence_type.capitalize()} Evidence {index - len(text_evidences)}"
                         )
             else:
                 st.write("No evidences contributed to this classification.")

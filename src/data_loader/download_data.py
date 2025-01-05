@@ -3,15 +3,18 @@ import zipfile
 import gdown
 from getpass import getpass
 import shutil
-from pathlib import Path
 from src.utils.path_utils import get_project_root
 
 # Constants
 PROJECT_ROOT = get_project_root()
 ZIP_FILE_PATH = str(PROJECT_ROOT / "data/raw/factify/factify_data.zip")
 EXTRACTION_DIR = str(PROJECT_ROOT / "data/raw/factify/extracted")
-TEMP_EXTRACTION_DIR = str(PROJECT_ROOT / "data/raw/factify/public_folder")
-GDRIVE_FILE_URL = "https://drive.google.com/uc?id=1ig7XEYU1UKDHrHgDYgqiARWvNdswgFEX"
+# Change to str(PROJECT_ROOT / "data/raw/factify/public_folder") if running for Factify1
+TEMP_EXTRACTION_DIR = str(PROJECT_ROOT / "data/raw/factify/factify2")
+# Factify1
+# GDRIVE_FILE_URL = "https://drive.google.com/uc?id=1ig7XEYU1UKDHrHgDYgqiARWvNdswgFEX"
+# Factify2
+GDRIVE_FILE_URL = "https://drive.google.com/uc?id=1i7cM3KyG1_Ue5TtBBp38raFQqBxHeGDK"
 
 
 def ensure_directories():
