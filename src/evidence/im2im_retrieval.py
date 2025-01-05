@@ -161,9 +161,7 @@ if __name__ == "__main__":
     )
 
     image_corpus = ImageCorpus(image_feature)
-    # corpus = image_corpus.create_feature_corpus(image_dir)
-    print(list(image_corpus.feature_dict.keys())[0])
+    corpus = image_corpus.create_feature_corpus(image_dir)
 
     top_retrievals = image_corpus.retrieve_similar_images(query_image_path, top_k=5)
-    print(top_retrievals)
     visualize_retrieved_images(query_image_path, top_retrievals)

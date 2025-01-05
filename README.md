@@ -78,6 +78,23 @@ This will go over the preprocessed data and enrich the claim and evidence text w
 The new columns will appear in the `data/processed/` directory. 
 You should see `train_enriched.csv` and `test_enriched.csv` separately.
 
+## Creating the Corpus
+
+### Image Embeddings
+To create image corpus embeddings first create an empty 'evidence_feature.pkl' file (under the parent directory)
+that will store the image embeddings of Factify dataset. Then run the following command to create your image corpus and 
+visualize the retrieval results for '1_claim.jpg'.
+```bash
+python -m src.evidence.im2im_retrieval
+```
+### Text Embeddings
+To create text embeddings first create empty 'train_embeddings.h5' and 'test_embeddings.h5' files (under the parent directory)
+that will again store the textual evidence embeddings. Then run the following command to create your text evidence corpus
+and investigate the results.
+```bash
+python -m src.evidence.text2text_retrieval
+```
+
 ## Running the streamlit demo app
 To run the streamlit demo app, run the following command:
 

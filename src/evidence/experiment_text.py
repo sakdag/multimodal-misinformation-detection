@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer, CrossEncoder, util
 import torch
 from src.utils.path_utils import get_project_root
 
-def calculate_topk_accuracy(similarity,
+def calculate_topk_accuracy_text_retrieval(similarity,
                             k_values=[1, 2, 5, 10]):
 
     num_hits_at_k = {k: 0 for k in k_values}  # accuracy
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         test_csv_path=test_csv_path,
     )
 
-    results = calculate_topk_accuracy(similarity, k_values=[1, 2, 5, 10])
+    results = calculate_topk_accuracy_text_retrieval(similarity, k_values=[1, 2, 5, 10])
     print(results)
 
     # Save the results to a text file

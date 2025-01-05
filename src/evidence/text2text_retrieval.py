@@ -160,18 +160,13 @@ class TextCorpus:
 if __name__ == "__main__":
     import time
 
-    start_time = time.time()
     project_root = get_project_root()
     data_dir = os.path.join(project_root, "data", "preprocessed")
 
-    # query = train_enriched['evidence_enriched'][0]
-    # train_embeddings = os.path.join(get_project_root(), 'train_evidence_embeddings.pkl')
-    # test_embeddings = os.path.join(get_project_root(), 'test_evidence_embeddings.pkl')
-
-    # semantic = SemanticSimilarity(train_embeddings, test_embeddings)
-    # semantic.search(query, top_k=10)
-
-    # evidence = TextCorpus(data_dir, 'train')
+    evidence_train = TextCorpus(data_dir, 'train')
+    evidence_train.encode_corpus()
+    evidence_test = TextCorpus(data_dir, 'test')
+    evidence_test.encode_corpus()
 
     # Define file paths
     train_csv_path = os.path.join(data_dir, "train_enriched.csv")
@@ -196,8 +191,5 @@ if __name__ == "__main__":
 
     # Perform the semantic search
     results = similarity.search(query=first_query, top_k=top_k)
-    finish_time = time.time() - start_time
-    # Display the results
 
     print(results)
-    print(f"Finish time: {finish_time}")
