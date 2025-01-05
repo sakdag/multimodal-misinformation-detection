@@ -104,3 +104,17 @@ python -m streamlit run src/demo/app.py
 
 This will open a new tab in your browser with the demo app. 
 You should be able to enter multimodal claims and play around with the trained model and the pipeline.
+
+## Experiment with the Retrieval Module
+
+To evaluate the image retrieval performance you can run:
+```bash
+python -m src.evidence.experiment_image.py
+```
+To evaluate the text retrieval performance you can run:
+```bash
+python -m src.evidence.experiment_text.py
+```
+
+These will return you the top-K accuracy results. 
+
