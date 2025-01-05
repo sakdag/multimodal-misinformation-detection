@@ -1,0 +1,2 @@
+We use 'Multimodal Misinformation Detection using Large Vision-Language Models' as one of our baselines. The codes in this folder is taken from the official repository of LVLM4FV. 
+The original repository can be found in [here](https://github.com/TIBHannover/LVLM4FV).
