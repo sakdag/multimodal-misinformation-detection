@@ -8,7 +8,7 @@ class MultiViewClaimRepresentation(nn.Module):
     Multi-view claim representation module with transformer-like architecture
     for self-attention and cross-attention in text and image modalities.
     """
-    def __init__(self, text_input_dim=384, image_input_dim=1024, embed_dim=512, num_heads=8, dropout=0.1, mlp_ratio=4.0, fused_attn=False):
+    def __init__(self, text_input_dim=768, image_input_dim=1024, embed_dim=256, num_heads=8, dropout=0.1, mlp_ratio=4.0, fused_attn=False):
         super().__init__()
         self.text_input_dim = text_input_dim
         self.image_input_dim = image_input_dim
@@ -126,7 +126,7 @@ class CrossAttentionEvidenceConditioning(nn.Module):
     Cross-attention module to condition claim representations
     on textual and visual evidence.
     """
-    def __init__(self, text_input_dim=384, image_input_dim=1024, embed_dim=768, num_heads=8, dropout=0.1, mlp_ratio=4.0, fused_attn=False):
+    def __init__(self, text_input_dim=768, image_input_dim=1024, embed_dim=256, num_heads=8, dropout=0.1, mlp_ratio=4.0, fused_attn=False):
         super().__init__()
         self.num_heads = num_heads
         self.embed_dim = embed_dim
@@ -171,14 +171,19 @@ class CrossAttentionEvidenceConditioning(nn.Module):
 
     def forward(self, H_t=None, H_i=None, E_t=None, E_i=None):
         """
+        Args:
+            H_t: Text claim representations
+            H_i: Image claim representations
+            E_t: Text evidence
+            E_i: Image evidence
         Returns:
             (S_t, S_i): Each contains a tuple of (text_evidence_output, image_evidence_output)
         """
         S_t_t, S_t_i = None, None
         S_i_t, S_i_i = None, None
 
-        if H_t is not None:
-            # Text-to-text evidence attention
+        # Text claim with text evidence
+        if H_t is not None and E_t is not None:
             S_t_t = self.attention(
                 Q=self.text_WQ(H_t),
                 K=self.text_evidence_key(E_t),
@@ -190,7 +195,8 @@ class CrossAttentionEvidenceConditioning(nn.Module):
             S_t_t = S_t_t + self.text_mlp(S_t_t)
             S_t_t = self.text_text_ln2(S_t_t)
 
-            # Text-to-image evidence attention
+        # Text claim with image evidence
+        if H_t is not None and E_i is not None:
             S_t_i = self.attention(
                 Q=self.text_WQ(H_t),
                 K=self.image_evidence_key(E_i),
@@ -202,8 +208,8 @@ class CrossAttentionEvidenceConditioning(nn.Module):
             S_t_i = S_t_i + self.text_mlp(S_t_i)
             S_t_i = self.text_image_ln2(S_t_i)
 
-        if H_i is not None:
-            # Image-to-text evidence attention
+        # Image claim with text evidence
+        if H_i is not None and E_t is not None:
             S_i_t = self.attention(
                 Q=self.image_WQ(H_i),
                 K=self.text_evidence_key(E_t),
@@ -215,7 +221,8 @@ class CrossAttentionEvidenceConditioning(nn.Module):
             S_i_t = S_i_t + self.image_mlp(S_i_t)
             S_i_t = self.image_text_ln2(S_i_t)
 
-            # Image-to-image evidence attention
+        # Image claim with image evidence
+        if H_i is not None and E_i is not None:
             S_i_i = self.attention(
                 Q=self.image_WQ(H_i),
                 K=self.image_evidence_key(E_i),
@@ -234,37 +241,51 @@ class ClassificationModule(nn.Module):
     """
     Classification module that takes final text/image representations
     and outputs logits for {support, refute, not enough info}
-    for each evidence path.
+    for either each evidence path or a single unified prediction.
     """
-    def __init__(self, embed_dim=768, hidden_dim=256, num_classes=3, dropout=0.1):
+    def __init__(self, embed_dim=256, hidden_dim=64, num_classes=3, dropout=0.1, factify=False):
         super().__init__()
-        # MLPs for text representations
-        self.mlp_text_given_text = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes)
-        )
-        self.mlp_text_given_image = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes)
-        )
+        self.factify = factify
         
-        # MLPs for image representations
-        self.mlp_image_given_text = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes)
-        )
-        self.mlp_image_given_image = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_classes)
-        )
+        if factify:
+            # Single MLP for unified prediction (3 layers)
+            self.unified_mlp = nn.Sequential(
+                nn.Linear(embed_dim * 4, hidden_dim * 2),  # Larger first layer for concatenated input
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+        else:
+            # Original separate MLPs for each path
+            self.mlp_text_given_text = nn.Sequential(
+                nn.Linear(embed_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+            self.mlp_text_given_image = nn.Sequential(
+                nn.Linear(embed_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+            
+            # MLPs for image representations
+            self.mlp_image_given_text = nn.Sequential(
+                nn.Linear(embed_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+            self.mlp_image_given_image = nn.Sequential(
+                nn.Linear(embed_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
 
     def forward(self, S_t=None, S_i=None):
         """
@@ -272,31 +293,58 @@ class ClassificationModule(nn.Module):
             S_t: Tuple of (text_given_text, text_given_image) representations
             S_i: Tuple of (image_given_text, image_given_image) representations
         Returns:
-            y_t: Tuple of (text_given_text_logits, text_given_image_logits)
-            y_i: Tuple of (image_given_text_logits, image_given_image_logits)
+            If factify:
+                Single prediction tensor of shape (B, num_classes)
+            Else:
+                Original tuple of tuples with separate path predictions
         """
-        y_t_t, y_t_i = None, None
-        y_i_t, y_i_i = None, None
+        if self.factify:
+            # Pool each representation separately
+            pooled_features = []
+            
+            if S_t is not None:
+                S_t_t, S_t_i = S_t
+                if S_t_t is not None:
+                    pooled_features.append(S_t_t.mean(dim=1))
+                if S_t_i is not None:
+                    pooled_features.append(S_t_i.mean(dim=1))
+            
+            if S_i is not None:
+                S_i_t, S_i_i = S_i
+                if S_i_t is not None:
+                    pooled_features.append(S_i_t.mean(dim=1))
+                if S_i_i is not None:
+                    pooled_features.append(S_i_i.mean(dim=1))
+            
+            # Concatenate all available features
+            concatenated = torch.cat(pooled_features, dim=1)
+            # Single prediction
+            return self.unified_mlp(concatenated), None
+        
+        else:
+            # Original separate path logic
+            y_t_t, y_t_i = None, None
+            y_i_t, y_i_i = None, None
+            
+            if S_t is not None:
+                S_t_t, S_t_i = S_t
+                if S_t_t is not None:
+                    pooled_t_t = S_t_t.mean(dim=1)
+                    y_t_t = self.mlp_text_given_text(pooled_t_t)
+                if S_t_i is not None:
+                    pooled_t_i = S_t_i.mean(dim=1)
+                    y_t_i = self.mlp_text_given_image(pooled_t_i)
 
-        if S_t is not None:
-            S_t_t, S_t_i = S_t
-            if S_t_t is not None:
-                pooled_t_t = S_t_t.mean(dim=1)
-                y_t_t = self.mlp_text_given_text(pooled_t_t)
-            if S_t_i is not None:
-                pooled_t_i = S_t_i.mean(dim=1)
-                y_t_i = self.mlp_text_given_image(pooled_t_i)
+            if S_i is not None:
+                S_i_t, S_i_i = S_i
+                if S_i_t is not None:
+                    pooled_i_t = S_i_t.mean(dim=1)
+                    y_i_t = self.mlp_image_given_text(pooled_i_t)
+                if S_i_i is not None:
+                    pooled_i_i = S_i_i.mean(dim=1)
+                    y_i_i = self.mlp_image_given_image(pooled_i_i)
 
-        if S_i is not None:
-            S_i_t, S_i_i = S_i
-            if S_i_t is not None:
-                pooled_i_t = S_i_t.mean(dim=1)
-                y_i_t = self.mlp_image_given_text(pooled_i_t)
-            if S_i_i is not None:
-                pooled_i_i = S_i_i.mean(dim=1)
-                y_i_i = self.mlp_image_given_image(pooled_i_i)
-
-        return (y_t_t, y_t_i), (y_i_t, y_i_i)
+            return (y_t_t, y_t_i), (y_i_t, y_i_i)
 
 
 class MisinformationDetectionModel(nn.Module):
@@ -304,19 +352,24 @@ class MisinformationDetectionModel(nn.Module):
     End-to-end model combining:
     1) Multi-view claim representation
     2) Cross-attention evidence conditioning
-    3) Classification for each evidence path
+    3) Classification for each evidence path or unified prediction
     """
     def __init__(self, 
-                 text_input_dim=384,   # DeBERTa-v3-xsmall hidden size
+                 text_input_dim=768,   # DeBERTa-v3-base hidden size
                  image_input_dim=1024,  # Swinv2-base hidden size
-                 embed_dim=512,
+                 embed_dim=256,
                  num_heads=8,
                  dropout=0.1,
-                 hidden_dim=256,
+                 hidden_dim=64,
                  num_classes=3,
                  mlp_ratio=4.0,
-                 fused_attn=False):
+                 fused_attn=False,
+                 factify=False,
+                 text_only=False):
         super().__init__()
+        
+        self.factify = factify
+        self.text_only = text_only
         
         self.representation = MultiViewClaimRepresentation(
             text_input_dim=text_input_dim,
@@ -336,12 +389,26 @@ class MisinformationDetectionModel(nn.Module):
             mlp_ratio=mlp_ratio,
             fused_attn=fused_attn
         )
-        self.classifier = ClassificationModule(
-            embed_dim=embed_dim, 
-            hidden_dim=hidden_dim, 
-            num_classes=num_classes,
-            dropout=dropout
-        )
+        
+        if text_only:
+            # Single MLP for text-only prediction (3 layers)
+            self.text_classifier = nn.Sequential(
+                nn.Linear(embed_dim, hidden_dim * 2),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+        else:
+            self.classifier = ClassificationModule(
+                embed_dim=embed_dim, 
+                hidden_dim=hidden_dim, 
+                num_classes=num_classes,
+                dropout=dropout,
+                factify=factify
+            )
         
         # Initialize weights
         self._initialize_weights()
@@ -365,23 +432,40 @@ class MisinformationDetectionModel(nn.Module):
             E_i (Tensor): Image evidence embeddings (B, L_e_i, D)
         
         Returns:
-            y_t: Tuple of (text_given_text_logits, text_given_image_logits)
-            y_i: Tuple of (image_given_text_logits, image_given_image_logits)
-            Each logit tensor has shape (B, num_classes)
+            If text_only:
+                text_pred: Text-only prediction tensor (B, num_classes)
+            If factify:
+                unified_pred: Single prediction tensor (B, num_classes)
+            Else:
+                Original tuple of tuples with separate path predictions
         """
+        if self.text_only:
+            # Process only text modality
+            H_t, _ = self.representation(X_t=X_t)
+            (S_t_t, _), _ = self.cross_attn(H_t=H_t, E_t=E_t)
+            
+            # Pool text features and classify
+            pooled_text = S_t_t.mean(dim=1)
+            text_pred = self.text_classifier(pooled_text)
+            return text_pred, None
+        
         # Get fused claim representations
         H_t, H_i = self.representation(X_t, X_i)
         
         # Get evidence-conditioned representations for each path
         (S_t_t, S_t_i), (S_i_t, S_i_i) = self.cross_attn(H_t, H_i, E_t, E_i)
         
-        # Get predictions for each evidence path
-        (y_t_t, y_t_i), (y_i_t, y_i_i) = self.classifier(
-            S_t=(S_t_t, S_t_i),
-            S_i=(S_i_t, S_i_i)
-        )
-        
-        return (y_t_t, y_t_i), (y_i_t, y_i_i)
+        if self.factify:
+            unified_pred, _ = self.classifier(
+                S_t=(S_t_t, S_t_i),
+                S_i=(S_i_t, S_i_i)
+            )
+            return unified_pred, None
+        else:
+            return self.classifier(
+                S_t=(S_t_t, S_t_i),
+                S_i=(S_i_t, S_i_i)
+            )
 
 
 if __name__ == "__main__":

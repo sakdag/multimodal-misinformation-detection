@@ -29,48 +29,104 @@ category_to_labels = {
     'Refute': [2, 2, 2, 2]              # Refute for all paths
 }
 
-def prepare_h5_dataset(csv_path, h5_path):
+# Add reverse mapping from label patterns to categories
+labels_to_category = {
+    tuple([0, 1, 1, 1]): 'Support_Text',
+    tuple([0, 0, 0, 0]): 'Support_Multimodal',
+    tuple([1, 1, 1, 1]): 'Insufficient_Text',
+    tuple([1, 1, 1, 0]): 'Insufficient_Multimodal',
+    tuple([2, 2, 2, 2]): 'Refute'
+}
+
+# Add category to index mapping for classification
+category_to_idx = {
+    'Support_Text': 0,
+    'Support_Multimodal': 1,
+    'Insufficient_Text': 2,
+    'Insufficient_Multimodal': 3,
+    'Refute': 4
+}
+
+# Add index to category mapping for converting predictions back to categories
+idx_to_category = {v: k for k, v in category_to_idx.items()}
+
+# Add simplified category mappings
+simplified_category_mapping = {
+    'Support_Text': 'Support',
+    'Support_Multimodal': 'Support',
+    'Insufficient_Text': 'NEI',
+    'Insufficient_Multimodal': 'NEI',
+    'Refute': 'Refute'
+}
+
+simplified_category_to_idx = {
+    'Support': 0,
+    'NEI': 1,
+    'Refute': 2
+}
+
+simplified_idx_to_category = {v: k for k, v in simplified_category_to_idx.items()}
+
+def convert_to_simplified_category(category_idx):
+    """Convert 5-class category index to 3-class simplified index."""
+    category = idx_to_category[category_idx]
+    simplified_category = simplified_category_mapping[category]
+    return simplified_category_to_idx[simplified_category]
+
+def prepare_h5_dataset(csv_path, h5_path, enriched=False):
     """
-    Prepare h5 dataset from CSV file where each index contains complete sample data
+    Prepare h5 dataset from CSV file where each index contains complete sample data.
+    Skips samples where either claim image or evidence image is missing.
+    
+    Args:
+        csv_path: Path to input CSV file
+        h5_path: Path to output H5 file
+        enriched: If True, use enriched claim/evidence text fields
     """
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(h5_path), exist_ok=True)
     
     # Read CSV file
-    df = pd.read_csv(csv_path, index_col=0)[['claim', 'claim_image', 'evidence', 'evidence_image', 'category']]
+    columns = ['claim_enriched' if enriched else 'claim',
+              'claim_image',
+              'evidence_enriched' if enriched else 'evidence', 
+              'evidence_image',
+              'category']
+    df = pd.read_csv(csv_path, index_col=0)[columns]
     
     with h5py.File(h5_path, 'w') as f:
         # Process each row
-        for idx, (_, row) in enumerate(df.iterrows()):
-            # Create group for this sample
-            sample_group = f.create_group(str(idx))
-            
-            # Store text data
-            sample_group.create_dataset('claim', data=row['claim'])
-            sample_group.create_dataset('document', data=row['evidence'])
-            
-            # Process and store images
+        valid_idx = 0
+        for _, row in df.iterrows():
+            # Try to process both images first to check if they exist
             try:
                 claim_img = Image.open(row['claim_image']).convert('RGB')
                 claim_img_tensor = preprocess(claim_img).numpy()
-            except Exception as e:
-                logger.warning(f"Error processing claim image for idx {idx}: {e}")
-                claim_img_tensor = np.zeros((3, 256, 256), dtype='float32')
-            sample_group.create_dataset('claim_image', data=claim_img_tensor)
-            
-            try:
+                
                 doc_img = Image.open(row['evidence_image']).convert('RGB')
                 doc_img_tensor = preprocess(doc_img).numpy()
             except Exception as e:
-                logger.warning(f"Error processing evidence image for idx {idx}: {e}")
-                doc_img_tensor = np.zeros((3, 256, 256), dtype='float32')
+                logger.warning(f"Skipping sample due to missing image: {e}")
+                continue
+                
+            # Create group for this sample only if both images are valid
+            sample_group = f.create_group(str(valid_idx))
+            
+            # Store text data
+            sample_group.create_dataset('claim', data=row['claim_enriched' if enriched else 'claim'])
+            sample_group.create_dataset('document', data=row['evidence_enriched' if enriched else 'evidence'])
+            
+            # Store the processed images
+            sample_group.create_dataset('claim_image', data=claim_img_tensor)
             sample_group.create_dataset('document_image', data=doc_img_tensor)
             
             # Store multi-path labels
             labels = category_to_labels.get(row['category'], [1, 1, 1, 1])  # Default to NEI if category not found
             sample_group.create_dataset('labels', data=np.array(labels, dtype=np.int64))
+            
+            valid_idx += 1
     
-    logger.info(f"Created H5 dataset at {h5_path}")
+    logger.info(f"Created H5 dataset at {h5_path} with {valid_idx} valid samples")
 
 
 class MisinformationDataset(Dataset):
