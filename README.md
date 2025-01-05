@@ -1,17 +1,20 @@
 # Multimodal Misinformation Detection
 
-This project is part of a PhD class in applied NLP, focusing on multimodal misinformation detection. The repository includes scripts for data downloading, preprocessing, and building classifiers to detect misinformation using multimodal data.
+This repository contains source codes for class project we delivered as part of a graduate class in applied NLP, at Middle East Technical University Computer Engineering department. Project is focusing on multimodal misinformation detection.
 
 ## Table of Contents
 - [Project Overview](#project-overview)
 - [Environment Setup](#environment-setup)
 - [Installing Dependencies](#installing-dependencies)
-- [Add Formatter](#add-formatter)
 - [Downloading the Data](#downloading-the-data)
+- [Downloading the Images](#downloading-the-images)
+- [Preprocessing the Data](#preprocessing-the-data)
+- [Enriching Claim and Evidence Text Using Image Captioning](#enriching-claim-and-evidence-text-using-image-captioning)
+- [Running the Streamlit Demo App](#running-the-streamlit-demo-app)
 
 ## Project Overview
 
-This project aims to detect misinformation in multimodal data. 
+This project aims to detect misinformation in multimodal data through evidence-backed approach.
 
 ## Environment Setup
 
